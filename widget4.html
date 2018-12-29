@@ -1,0 +1,525 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+   
+</head>
+
+<body>
+
+</body>
+</html>
+
+<style>
+
+table, td 
+{
+    border: 1px solid black;
+    text-align: center;
+}
+
+tr:nth-child(even) {
+  background-color: #ffffe6
+}
+
+tr:hover
+{
+	color: black;
+	background-color: #ffff99
+}
+
+</style>
+
+<script type="text/javascript" >
+
+function uiContainer()
+{
+	return document.createElement('div');
+}
+
+function uiTable()
+{
+	let ui = document.createElement('table');	
+ 
+	ui.createTBody();
+	ui.createTHead();
+	ui.createTFoot();
+
+	return ui;
+}
+
+function uiPaginator()
+{
+	let ui = document.createElement('div');
+	ui.first = document.createElement('button');
+	ui.previous = document.createElement('button');
+	ui.next = document.createElement('button');
+	ui.last = document.createElement('button');
+	ui.pagesize = document.createElement('select');	
+	
+	//widget properties values
+	ui.first.innerText = 'FirstPage';	
+	ui.previous.innerText = 'PreviousPage';	
+	ui.next.innerText = 'NextPage';
+	ui.last.innerText = 'LastPage';
+
+	ui.appendChild(ui.first);
+	ui.appendChild(ui.previous);
+	ui.appendChild(ui.next);
+	ui.appendChild(ui.last);
+	ui.appendChild(ui.pagesize);
+
+	return ui;
+}
+
+function uiToolbar()
+{
+	let ui = document.createElement('div');
+	
+	ui.load = document.createElement('button');
+	ui.restore = document.createElement('button');	
+
+	ui.load.innerText = 'retrieveDataFromServer';
+	ui.restore.innerText = 'restoreSourceObject';
+
+	ui.appendChild(ui.load);
+	ui.appendChild(ui.restore);
+
+	return ui;
+}
+
+function bodyTextFormat( value )
+{
+	let cell = document.createElement('td');
+	cell.innerText = value;
+
+	return cell;	
+}
+
+function bodyBooleanFormat( value )
+{
+	let cell = document.createElement('td');
+	let x = document.createElement("INPUT");
+	x.setAttribute("type", "checkbox");
+
+	( value == true )? x.checked = true : x.checked = false;
+
+	x.disabled = true;
+	cell.appendChild(x);
+
+	return cell;
+};
+
+function headerButtonSort(value)
+{
+	let cell = document.createElement('th');
+	let btn = document.createElement('button');
+
+	btn.innerText = value;
+	btn.ascendent = null;
+	btn.setAttribute('style', 'width:100%');
+
+	cell.appendChild(btn);
+
+	return cell;
+}
+
+function defaultSort(valueA, valueB )
+{
+	if ( valueA === valueB ) 
+    {
+        return 0;
+    }
+    else 
+    {
+    	return (valueA > valueB) ? -1 : 1;
+    }
+}
+
+
+function countPagesFromArray( matrixData, pageSize )
+{
+	let count = 0;
+
+	if ( matrixData.length > 0 && pageSize > 0 )
+	{
+		count = Math.trunc(matrixData.length/pageSize);
+
+		if ( matrixData.length%pageSize > 0 || pageSize > matrixData.length  ) 
+			count+=1;
+	}
+	
+	return count;
+}
+
+function extractPageFromArray( matrixData, pageNumber, pageSize )
+{
+	let result = [[]];
+
+	let pages = countPagesFromArray(matrixData, pageSize);
+
+	if ( pageNumber <= pages && pages > 0 )
+	{
+		let offset = (+pageNumber-1)*pageSize;
+		let diff = 0;
+
+		if ( pageNumber*pageSize > matrixData.length )
+		{
+			diff = (pageNumber*pageSize) - +matrixData.length;
+		}
+		
+		let length = +offset + +pageSize - +diff;
+		result = matrixData.slice(offset,length);
+	}
+	
+	return result;
+}
+
+function tableBodyPush( table, dataArray, bodyCellRenders )
+	{
+		//row range require column range matching
+		if ( dataArray.length == bodyCellRenders.length )
+		{
+			let row = document.createElement('tr');
+
+			for( let index = 0; index<bodyCellRenders.length; index++)
+			{
+				row.appendChild( bodyCellRenders[index](dataArray[index]) );
+			}
+
+			table.tBodies[0].appendChild(row);
+		}
+	}
+	
+	function tableBodyPopulate( table, matrixData, bodyCellRenders )
+	{	
+		tableBodyClear(table);
+
+		if( matrixData[0].length > 0)
+		{
+			for( let index = 0; index<matrixData.length; index++)
+			{
+				tableBodyPush(table, matrixData[index],bodyCellRenders);
+			}
+		}
+	}
+
+	function tableBodyClear( table )
+	{
+		//why?: http://jsperf.com/innerhtml-vs-removechild
+		while ( table.tBodies[0].firstChild ) 
+		{
+			table.tBodies[0].removeChild( table.tBodies[0].firstChild );
+		}
+	}	
+
+	//function tableFooterPush( table, dataArray, bodyCellRenders ){};
+	//function tableFooterPopulate( table, matrixData, bodyCellRenders ){};
+	//function tableFooterClear( table ){};
+
+	function tableHeaderPush( table, dataArray, headerCellRenders )
+	{
+		if ( dataArray.length == headerCellRenders.length )
+		{
+			let row = document.createElement('tr');
+
+			for( let index = 0; index<headerCellRenders.length; index++)
+			{
+				row.appendChild( headerCellRenders[index](dataArray[index]) );
+			}
+
+			table.tHead.appendChild(row);
+		}
+	};
+	
+	function tableHeaderClear( table )
+	{
+		//why?: http://jsperf.com/innerhtml-vs-removechild
+		while ( table.tBodies[0].firstChild ) 
+		{
+			table.tHead.removeChild( table.tBodies[0].firstChild );
+		}
+	}	
+
+
+let datatableStaticSettings =
+{
+	table:
+	{
+		headerTitle: [ 'Column-A', 'Column-B', 'Column-C', 'Column-D' ],
+		headerCellRenders: [ headerButtonSort, headerButtonSort, headerButtonSort, headerButtonSort ],
+		headerSortFunctions: [ defaultSort, defaultSort, defaultSort, defaultSort ],
+
+		sourceDataSet: null,
+
+		bodyCellRenders: [ bodyTextFormat, bodyTextFormat, bodyTextFormat, bodyBooleanFormat ],
+		bodyCellTransformFunctions: null,
+
+		footerDataSet: null,
+		footerCellRenders: null,
+		footerCellTransformFunctions: null
+	},
+
+	paginator:
+	{
+		pageSizeOptions: [ {value:5,text:'5'}, {value:10,text:'10'}, {value:20,text:'20'}, {value:50,text:'50'} ],
+		enableShowAllResults: false
+	}
+}
+
+function datatable( settings )
+{
+	let current = new EventTarget();
+
+	//-------------------------widget ui elements--------------------------
+
+	let ui 			= uiContainer();
+
+	ui.table 		= uiTable();
+	ui.paginator 	= uiPaginator();
+	ui.toolbar 		= uiToolbar();
+
+	//-------------------------widget properties---------------------------
+
+	let _currentPage = 1;
+	let _sourceDataSet = {};
+	let _bufferDataSet = {};
+	let _currentSortIndex = -1;
+	let _currentOrderingAscendent = null;
+
+	Object.defineProperty(current,'sourceDataSet', 
+	{ 
+		set: function(value)
+		{ 
+			_sourceDataSet = value;
+			current.dispatchEvent( new CustomEvent('sourcechange') );
+		},
+
+		get: function()
+		{
+			return _sourceDataSet;
+		}
+	});
+
+	Object.defineProperty(current,'bufferDataSet', 
+	{ 
+		set: function(value)
+		{ 
+			_bufferDataSet = value;
+			current.dispatchEvent( new CustomEvent('bufferchange') );
+		},
+
+		get: function()
+		{
+			return _bufferDataSet;
+		}
+	});	
+
+
+	//-------------------------widget actions-------------------------------
+
+	function _updateBuffer()
+	{
+		current.bufferDataSet = current.sourceDataSet;
+	}
+
+	function showNextPageOfResults()
+	{
+		let total = countPagesFromArray(_bufferDataSet,ui.paginator.pagesize.value);
+		let nextPage = +_currentPage+1;
+
+		if ( nextPage == total )
+		{
+			showLastPageOfResults();
+		}
+		else
+		{
+			tableBodyPopulate( ui.table, extractPageFromArray(current.bufferDataSet, nextPage, ui.paginator.pagesize.value), settings.table.bodyCellRenders);
+			ui.paginator.previous.disabled = false;
+		
+			ui.paginator.first.disabled = false;
+			_currentPage = nextPage;
+		}
+
+	}
+
+	function showPreviousPageOfResults()
+	{
+		let prevPage = +_currentPage-1;
+
+		if ( prevPage == 1 )
+		{
+			showFirstPageOfResults();
+		}
+		else
+		{
+			tableBodyPopulate( ui.table, extractPageFromArray(current.bufferDataSet, prevPage, ui.paginator.pagesize.value), settings.table.bodyCellRenders);
+			ui.paginator.next.disabled = false;
+			ui.paginator.last.disabled = false;
+			_currentPage = prevPage;
+		}
+	}
+
+	function showFirstPageOfResults()
+	{
+		let total = countPagesFromArray(current.bufferDataSet, ui.paginator.pagesize.value);
+
+		tableBodyPopulate( ui.table, extractPageFromArray(current.bufferDataSet, 1, ui.paginator.pagesize.value), settings.table.bodyCellRenders);
+		ui.paginator.first.disabled = true;
+		ui.paginator.previous.disabled = true;
+
+		if ( total == 1 )
+		{
+			ui.paginator.next.disabled = true;
+			ui.paginator.last.disabled = true;
+		}
+		else
+		{
+			ui.paginator.next.disabled = false;
+			ui.paginator.last.disabled = false;
+		}
+
+		_currentPage = 1;
+	}
+
+	function showLastPageOfResults()
+	{
+		let pagesize = ui.paginator.pagesize.value;
+		let total = countPagesFromArray(current.bufferDataSet,pagesize);
+
+		tableBodyPopulate( ui.table, extractPageFromArray(current.bufferDataSet, total, pagesize), settings.table.bodyCellRenders);
+		ui.paginator.last.disabled = true;
+		ui.paginator.next.disabled = true;
+
+		if ( total == 1 )
+		{
+			ui.paginator.first.disabled = true;
+			ui.paginator.previous.disabled = true;
+		}
+		else
+		{
+			ui.paginator.first.disabled = false;
+			ui.paginator.previous.disabled = false;
+		}
+
+		_currentPage = total;
+	}
+
+	function _sortArrayWrapper( index, sortFunction )
+	{
+		function fx( valueA, valueB )
+		{
+			return sortFunction( valueA[index], valueB[index] );
+		}
+
+		return fx;
+	}	
+
+	function processBuffer()
+	{
+		if ( _currentOrderingAscendent == true )
+		{
+			current.bufferDataSet = current.bufferDataSet.sort( _sortArrayWrapper(_currentSortIndex,settings.table.headerSortFunctions[_currentSortIndex]) );
+		}
+		else
+		{
+			current.bufferDataSet = current.bufferDataSet.sort( _sortArrayWrapper(_currentSortIndex,settings.table.headerSortFunctions[_currentSortIndex]) ).reverse();
+		}
+	}
+
+	
+	//-------------------------widget ui init------------------------------
+
+	function init()
+	{
+		tableHeaderPush( ui.table, settings.table.headerTitle, settings.table.headerCellRenders );
+
+		ui.toolbar.restore.disabled = true;
+
+		ui.paginator.first.disabled = true;
+		ui.paginator.previous.disabled = true;
+		ui.paginator.next.disabled = true;
+		ui.paginator.last.disabled = true;
+
+		for( settingOption of settings.paginator.pageSizeOptions )
+		{
+			let option = document.createElement('option');
+			option.text = settingOption.text;
+			option.value = settingOption.value;
+			ui.paginator.pagesize.add(option);
+		}
+
+		ui.appendChild( ui.table );
+		ui.appendChild( ui.paginator );
+		ui.appendChild( ui.toolbar );
+
+		//--------------------------connecting internal signals---------------------
+
+		current.addEventListener('sourcechange', _updateBuffer );
+		current.addEventListener('bufferchange', showFirstPageOfResults );
+		
+
+		for( let index=0; index < ui.table.tHead.firstChild.childElementCount; index++)
+		{
+			ui.table.tHead.firstChild.children[index].addEventListener('click', function()
+			{
+				_currentSortIndex = index;
+				
+				if ( ui.table.tHead.firstChild.children[index].ascendent == null )
+				{
+					ui.table.tHead.firstChild.children[index].ascendent = true
+				}
+
+				_currentOrderingAscendent = ui.table.tHead.firstChild.children[index].ascendent;
+				processBuffer();
+
+				ui.table.tHead.firstChild.children[index].ascendent = !ui.table.tHead.firstChild.children[index].ascendent;
+				
+			});
+		}
+
+		ui.paginator.first.addEventListener('click', showFirstPageOfResults );
+		ui.paginator.previous.addEventListener('click', showPreviousPageOfResults );
+		ui.paginator.next.addEventListener('click', showNextPageOfResults );
+		ui.paginator.last.addEventListener('click', showLastPageOfResults );
+		ui.paginator.pagesize.addEventListener('change', showFirstPageOfResults );
+
+
+
+		current.ui = ui;
+
+		return current;
+	};
+
+	
+
+
+	return init();
+}
+
+
+
+let dt = datatable( datatableStaticSettings );
+let service = new XMLHttpRequest();
+
+
+//--------------------external signals-------------------------
+
+function retrieveResultsFromServer()
+{
+	service.open('GET', 'http://localhost:80/test.php' );
+	service.send(null);
+}
+
+function tryUpdateDataSource()
+{
+	if (service.readyState == 4 && service.status == 200 ) 
+		dt.sourceDataSet = JSON.parse(service.responseText);
+}
+
+
+service.addEventListener('readystatechange', tryUpdateDataSource);
+dt.ui.toolbar.load.addEventListener('click', retrieveResultsFromServer );
+
+document.body.appendChild(dt.ui);
+
+</script>
