@@ -262,13 +262,18 @@ function DataTable()
 	function setSourceContent( value )
 	{
 		source = value.slice();
+		buffer = source.slice();
 		self.dispatchEvent( new CustomEvent('bufferchanged') );
-		setBufferContent(value);
 	}
 
 	function getCurrentContent()
 	{
 		return extractPageFromArray(buffer, currentPage, paginator.pagesize.value);
+	}
+
+	function getBufferContent()
+	{
+		return buffer;
 	}
 
 	function setBufferContent(value)
@@ -277,13 +282,8 @@ function DataTable()
 		self.dispatchEvent( new CustomEvent('bufferchanged') );
 	}
 
-	function getBufferContent()
-	{
-		return buffer;
-	}
-
 	Object.defineProperty(self, 'value', { set: setSourceContent, get: getCurrentContent });
-	Object.defineProperty(self, 'buffer', { set: setBufferContent, get: getBufferContent });
+	Object.defineProperty(self, 'buffer', { set: setBufferContent });
 
 	
 	function buildSortFunction( index, sortFunction )
