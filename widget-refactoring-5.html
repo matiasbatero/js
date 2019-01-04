@@ -1,0 +1,484 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+   
+</head>
+
+<body>
+
+</body>
+</html>
+
+<style>
+
+table, td 
+{
+    border: 1px solid black;
+    text-align: center;
+}
+
+tr:nth-child(even) {
+  background-color: #ffffe6
+}
+
+tr:hover
+{
+	color: black;
+	background-color: #ffff99
+}
+
+</style>
+
+<script type="text/javascript" >
+
+function countPagesFromArray( matrixData, pageSize )
+{
+	let count = 0;
+
+	if ( matrixData.length > 0 && pageSize > 0 )
+	{
+		count = Math.trunc(matrixData.length/pageSize);
+
+		if ( matrixData.length%pageSize > 0 || pageSize > matrixData.length  ) 
+			count+=1;
+	}
+	
+	return count;
+}
+
+function extractPageFromArray( matrixData, pageNumber, pageSize )
+{
+	let result = [[]];
+
+	let pages = countPagesFromArray(matrixData, pageSize);
+
+	if ( pageNumber <= pages && pages > 0 )
+	{
+		let offset = (+pageNumber-1)*pageSize;
+		let diff = 0;
+
+		if ( pageNumber*pageSize > matrixData.length )
+		{
+			diff = (pageNumber*pageSize) - +matrixData.length;
+		}
+		
+		let length = +offset + +pageSize - +diff;
+		result = matrixData.slice(offset,length);
+	}
+	
+	return result;
+}
+
+function text( cell, value )
+{
+	cell.innerText = value;
+
+	return cell;	
+}
+
+function updateSelectOptions( select, optionArray )
+{
+	for( settingOption of optionArray )
+	{
+		let option = document.createElement('option');
+		option.text = settingOption.text;
+		option.value = settingOption.value;
+		select.add(option);
+	}
+}
+
+function tableview(bodyCellRenders,headerCellRenders,titles )
+{
+	let self = document.createElement('table');	
+
+	self.createTBody();
+	self.createTHead();
+	self.createTFoot();
+
+	self.tableBodyPush = function( dataArray )
+	{
+		//row range require column range matching
+		if ( dataArray.length == bodyCellRenders.length )
+		{
+			let row = document.createElement('tr');
+
+			for( let index = 0; index<bodyCellRenders.length; index++)
+			{
+				let bcell = document.createElement('td');
+				row.appendChild( bodyCellRenders[index](bcell,dataArray[index]) );
+			}
+
+			self.tBodies[0].appendChild(row);
+		}
+	}
+
+	self.tableBodyUpdate = function( matrixData )
+	{	
+		self.tableBodyClear(self);
+
+		if( matrixData[0].length > 0)
+		{
+			for( let index = 0; index<matrixData.length; index++)
+			{
+
+				self.tableBodyPush( matrixData[index],bodyCellRenders );
+			}
+		}
+	}
+
+	self.tableBodyClear = function( )
+	{
+		//why?: http://jsperf.com/innerhtml-vs-removechild
+		while ( self.tBodies[0].firstChild ) 
+		{
+			self.tBodies[0].removeChild( self.tBodies[0].firstChild );
+		}
+	}
+
+	self.tableHeaderUpdate = function()
+	{	
+		self.tableHeaderClear();
+		self.tableHeaderPush();
+	}
+
+	self.tableHeaderPush = function()
+	{
+		if ( titles.length == headerCellRenders.length )
+		{
+			let row = document.createElement('tr');
+
+			for( let index = 0; index<headerCellRenders.length; index++)
+			{
+				let hcell = document.createElement('th')
+				row.appendChild( headerCellRenders[index](hcell, titles[index]) );
+			}
+
+			self.tHead.appendChild(row);
+		}
+	};
+
+	self.tableHeaderClear = function()
+	{
+		//why?: http://jsperf.com/innerhtml-vs-removechild
+		while ( self.tHead.firstChild ) 
+		{
+			self.tHead.removeChild( self.tHead.firstChild );
+		}
+	}
+
+	return self;
+}
+
+function tablepaginator()
+{
+	//paginator
+ 	let self = document.createElement('div');
+ 	
+	self.first = document.createElement('button');
+	self.previous = document.createElement('button');
+	self.next = document.createElement('button');
+	self.last = document.createElement('button');
+	self.pagesize = document.createElement('select');
+
+	self.first.innerText = 'FirstPage';	
+	self.previous.innerText = 'PreviousPage';	
+	self.next.innerText = 'NextPage';
+	self.last.innerText = 'LastPage';
+
+	self.first.disabled = true;
+	self.previous.disabled = true;
+	self.next.disabled = true;
+	self.last.disabled = true;
+	self.pagesize.disabled = true;
+
+	updateSelectOptions( self.pagesize, [ {value:5,text:'5'}, {value:10,text:'10'}, {value:20,text:'20'}, {value:50,text:'50'} ] );
+
+	self.appendChild(self.first);
+	self.appendChild(self.previous);
+	self.appendChild(self.next);
+	self.appendChild(self.last);
+	self.appendChild(self.pagesize);
+
+	return self;
+}
+
+function buttonsui()
+{
+	//button panel
+	let self = document.createElement('div');	
+	self.load = document.createElement('button');
+	self.restore = document.createElement('button');
+
+	self.load.innerText = 'retrieveDataFromServer';
+	self.restore.innerText = 'restoreSourceObject';
+
+ 	self.appendChild(self.load);
+	self.appendChild(self.restore);
+
+	return self;
+}
+
+function container()
+{
+	return document.createElement('div');
+}
+
+function defaultSort(valueA, valueB )
+{
+	if ( valueA === valueB ) 
+    {
+        return 0;
+    }
+    else 
+    {
+    	return (valueA > valueB) ? -1 : 1;
+    }
+}
+
+function SimpleTableModel()
+{
+	let self = new EventTarget();
+
+	let source = null;
+	let buffer = null;
+
+	Object.defineProperty(self,'value', 
+	{ 
+		set: function(newValue)
+		{ 
+			source = newValue.slice();
+			buffer = newValue.slice();
+			self.dispatchEvent( new CustomEvent('change') );
+		}, 
+
+		get: function(){return buffer;}
+	});
+
+	self.filter = function( filterFunction )
+	{
+		buffer = source.filter( filterFunction );
+		self.dispatchEvent( new CustomEvent('change') );
+	}
+
+	self.sort = function( sortFunction, ascendent )
+	{
+		buffer.sort( sortFunction );
+
+		if (!ascendent)
+			buffer = buffer.reverse();
+
+		self.dispatchEvent( new CustomEvent('change') );
+	}
+
+	self.count = function( pagesize )
+	{
+		return countPagesFromArray(buffer, pagesize);
+	}
+
+	self.extract = function( pagenumber, pagesize )
+	{
+		return extractPageFromArray( buffer, pagenumber, pagesize );
+	}
+
+	self.reset = function()
+	{
+		buffer = source.slice();
+		self.dispatchEvent( new CustomEvent('change') );
+	}
+
+	return self;
+}
+
+function DataTable(model)
+{
+	//ui
+	let self = container();
+	let table = tableview([text,text,text,text],[text,text,text,text],[ 'Column-A', 'Column-B', 'Column-C', 'Column-D' ] );
+	let paginator = tablepaginator();
+	let rowFilter = document.createElement('input');
+	rowFilter.type = 'text';
+	rowFilter.placeholder = 'Search results...'; 
+
+	table.tableHeaderUpdate();
+	self.appendChild( table );
+	self.appendChild( paginator );
+	self.appendChild( rowFilter );
+
+	//loguc
+	let currentPage = 0;	
+	let currentSortFunction = null;
+	let currentSortAscendentOrdering = true;
+	let currentFilterFunction = rowContainsText;
+	
+	
+	function buildSortFunction( index, sortFunction )
+	{
+		function fx( valueA, valueB )
+		{
+			return sortFunction( valueA[index], valueB[index] );
+		}
+
+		return fx;
+	}	
+
+
+	function rowContainsText( element )
+	{
+		return element.toString().includes( rowFilter.value );
+	}
+
+	function filter()
+	{
+		if ( rowFilter.value != '' )
+		{
+			if ( currentFilterFunction != null )
+			{
+				model.filter(currentFilterFunction);
+			}
+		}
+		else
+		{
+			model.reset();
+		}
+	}
+
+	
+
+	
+	function showNextPageOfResults()
+	{
+		let total = model.count(paginator.pagesize.value);
+		let nextPage = +currentPage+1;
+
+		if ( nextPage == total )
+		{
+			showLastPageOfResults();
+		}
+		else
+		{
+			table.tableBodyUpdate( model.extract(nextPage, paginator.pagesize.value) );
+			paginator.previous.disabled = false;
+		
+			paginator.first.disabled = false;
+			currentPage = nextPage;
+		}
+	}
+
+	function showPreviousPageOfResults()
+	{
+		let prevPage = +currentPage-1;
+
+		if ( prevPage == 1 )
+		{
+			showFirstPageOfResults();
+		}
+		else
+		{
+			table.tableBodyUpdate( model.extract( prevPage, paginator.pagesize.value) );
+			paginator.next.disabled = false;
+			paginator.last.disabled = false;
+			currentPage = prevPage;
+		}
+	}
+
+	function showFirstPageOfResults()
+	{
+		let total = model.count(paginator.pagesize.value);
+
+		table.tableBodyUpdate( model.extract( 1, paginator.pagesize.value) );
+		paginator.first.disabled = true;
+		paginator.previous.disabled = true;
+		paginator.pagesize.disabled = false;
+
+		if ( total == 1 )
+		{
+			paginator.next.disabled = true;
+			paginator.last.disabled = true;			
+		}
+		else
+		{
+			paginator.next.disabled = false;
+			paginator.last.disabled = false;
+		}
+
+		currentPage = 1;
+	}
+
+	function showLastPageOfResults()
+	{
+		let pagesize = paginator.pagesize.value;
+		let total = model.count(paginator.pagesize.value);
+
+		table.tableBodyUpdate( model.extract(total, pagesize));
+		paginator.last.disabled = true;
+		paginator.next.disabled = true;
+
+		if ( total == 1 )
+		{
+			paginator.first.disabled = true;
+			paginator.previous.disabled = true;
+		}
+		else
+		{
+			paginator.first.disabled = false;
+			paginator.previous.disabled = false;
+		}
+
+		currentPage = total;
+	}
+
+	self.onchange = function()
+	{
+		showFirstPageOfResults();
+	}
+
+	paginator.first.addEventListener('click', showFirstPageOfResults );
+	paginator.previous.addEventListener('click', showPreviousPageOfResults );
+	paginator.next.addEventListener('click', showNextPageOfResults );
+	paginator.last.addEventListener('click', showLastPageOfResults );
+	paginator.pagesize.addEventListener('change', self.onchange );
+	rowFilter.addEventListener('input', filter );	
+
+
+	for( let index=0; index < table.tHead.firstChild.childElementCount; index++)
+	{
+		table.tHead.firstChild.children[index].ascendent = true;
+
+		table.tHead.firstChild.children[index].addEventListener('click', function()
+		{
+			currentSortFunction = buildSortFunction(index,defaultSort);
+			currentSortAscendentOrdering = table.tHead.firstChild.children[index].ascendent;
+			
+			table.tHead.firstChild.children[index].ascendent = !table.tHead.firstChild.children[index].ascendent;
+			model.sort(currentSortFunction,currentSortAscendentOrdering);
+		});
+	}
+
+	
+
+	model.addEventListener('change', self.onchange );
+
+	return self;
+}
+
+let model = SimpleTableModel();
+let datatable = DataTable(model);
+let requester = new XMLHttpRequest();
+
+function updateDataTableSourceIfSuccess()
+{
+	if (requester.readyState == 4 && requester.status == 200 )
+	{
+		model.value = JSON.parse(requester.responseText);
+	}
+}
+
+requester.addEventListener('readystatechange', updateDataTableSourceIfSuccess );
+requester.open('get', 'http://localhost:80/js/test.php');
+requester.send();
+
+
+
+document.body.appendChild( datatable );
+
+</script>
